@@ -140,38 +140,22 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Mat src = inputFrame.rgba();//入力画像
+        Mat dst = src.clone();
         Imgproc.resize(crackMat, crackMat, src.size());
         RectF rect = faceDetect(src);
         Imgproc.rectangle(src, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 0, 0, 0), -1);
-        MatOfPoint maxArea = getMaxSkinArea(src);
-        if (maxArea != null) {
-            Rect rectOfArea = Imgproc.boundingRect(maxArea);
-            if(rectOfArea.area() - fist > 300000){
+        double maxArea = getMaxSkinArea(src);
+            if(maxArea - fist > 200000){
                 cracked = true;
                 soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
             }
             if(cracked){
-                Core.addWeighted(src, 1.0, crackMat, 1.0, 0, src);
+                Core.addWeighted(dst, 1.0, crackMat, 1.0, 0, dst);
             }
-            else {
-                Imgproc.rectangle(src, rectOfArea.tl(), rectOfArea.br(), new Scalar(0, 255, 0), 3);
-            }
-            fist = rectOfArea.area();
-        }
-            /*Mat dst = Mat.zeros(src.width(),src.height(),CV_8U);//初期化
-               Imgproc.cvtColor(src, dst, Imgproc.COLOR_RGB2HSV);//HSVに変換
-               Mat src2 = dst;//HSV画像を代入
-               Mat dst2 = Mat.zeros(src.width(),src.height(),CV_8U);//初期化
-               Mat dst3 = Mat.zeros(src.width(),src.height(),CV_8U);//初期化
-               Scalar low = new Scalar( 0,58,88);//下限(H,S,V)
-               Scalar high = new Scalar(25,173,229);//上限(H,S,V)
-               Imgproc.medianBlur(src2, src2, 3);
-               Core.inRange( src2,  low,  high , dst2);//肌色抽出
-               //Imgproc.cvtColor(dst2, dst3, Imgproc.COLOR_HSV2BGR);
-               return dst2;*///return inputFrame.rgba();
-        return src;
+            fist = maxArea;
+        return dst;
     }
-    public static MatOfPoint getMaxSkinArea(Mat rgba) {
+    public static double getMaxSkinArea(Mat rgba) {
         if (rgba == null) {
             throw new IllegalArgumentException("parameter must not be null");
         }
@@ -188,31 +172,23 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Imgproc.findContours(hsv, contours, hierarchy, Imgproc.RETR_LIST,
                 Imgproc.CHAIN_APPROX_NONE);
 
-        if(contours.size() > 0) {
-            double maxArea = 0.0f;
-            int maxIdx = 0;
-            for (int i = 0; i < contours.size(); i++) {
-                double tmpArea = Imgproc.contourArea(contours.get(i));
-                if (maxArea < tmpArea) {
-                    maxArea = tmpArea;
-                    maxIdx = i;
-                }
+        double maxArea = 0.0f;
+        for (int i = 0; i < contours.size(); i++) {
+            double tmpArea = Imgproc.contourArea(contours.get(i));
+            if (maxArea < tmpArea) {
+                maxArea = tmpArea;
             }
-
-            return contours.get(maxIdx);
         }
-        else{
-            return null;
-        }
+        return maxArea;
     }
 
     RectF faceDetect(Mat src){
         detector = new FaceDetector.Builder(this)
                 .setTrackingEnabled(true)
-                .setLandmarkType(FaceDetector.ALL_LANDMARKS)
-                .setMode(FaceDetector.ACCURATE_MODE)
+                .setLandmarkType(FaceDetector.NO_LANDMARKS)
+                .setMode(FaceDetector.FAST_MODE)
                 .build();
-        RectF faceRect = new RectF(0, 0, 100 ,100);
+        RectF faceRect = new RectF(0, 0, 0 ,0);
         Bitmap bmp = Bitmap.createBitmap(src.cols(), src.rows(), Bitmap.Config.RGB_565);
         Utils.matToBitmap(src, bmp);
         Frame frame = new Frame.Builder().setBitmap(bmp).build();

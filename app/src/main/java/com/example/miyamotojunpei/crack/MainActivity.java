@@ -5,7 +5,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.PointF;
 import android.graphics.RectF;
-import android.hardware.Camera;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
 import android.os.Bundle;
@@ -13,7 +12,6 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.WindowManager;
 
 import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.face.Face;
@@ -21,7 +19,6 @@ import com.google.android.gms.vision.face.FaceDetector;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.JavaCameraView;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
@@ -30,7 +27,6 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
-import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
@@ -57,7 +53,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 {
                     Log.i(TAG, "OpenCV loaded successfully");
                     mOpenCvCameraView.enableView();
-                    //mOpenCvCameraView.setMaxFrameSize(864, 480);
                     mOpenCvCameraView.setResolution(864, 480);
                     crack = BitmapFactory.decodeResource(getResources(), R.drawable.crack);
                     crackMat = new Mat(crack.getHeight(), crack.getWidth(), CV_8UC4);
@@ -81,10 +76,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "called onCreate");
         super.onCreate(savedInstanceState);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
         mOpenCvCameraView = (MyCameraView) findViewById(R.id.activity_main);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
+        mOpenCvCameraView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         mOpenCvCameraView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

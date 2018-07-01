@@ -28,6 +28,7 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
@@ -42,9 +43,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     double fist = 1000000.0;
     Bitmap crack;
     Mat crackMat;
-    boolean cracked = false;
+    Bitmap crack1;
+    Mat crackMat1;
+    Bitmap crack2;
+    Mat crackMat2;
+    int cracked = 0;
     SoundPool soundPool;
     private int sound_crack;
+    private int sound_explode;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -57,6 +63,15 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     crack = BitmapFactory.decodeResource(getResources(), R.drawable.crack);
                     crackMat = new Mat(crack.getHeight(), crack.getWidth(), CV_8UC4);
                     Utils.bitmapToMat(crack, crackMat);
+                    crack1 = BitmapFactory.decodeResource(getResources(), R.drawable.crack1);
+                    crackMat1 = new Mat(crack1.getHeight(), crack1.getWidth(), CV_8UC4);
+                    Utils.bitmapToMat(crack1, crackMat1);
+                    crack2 = BitmapFactory.decodeResource(getResources(), R.drawable.crack2);
+                    crackMat2 = new Mat(crack2.getHeight(), crack2.getWidth(), CV_8UC4);
+                    Utils.bitmapToMat(crack2, crackMat2);
+                    Imgproc.resize(crackMat, crackMat, new Size(864, 480));
+                    Imgproc.resize(crackMat1, crackMat1, new Size(864, 480));
+                    Imgproc.resize(crackMat2, crackMat2, new Size(864, 480));
                 } break;
                 default:
                 {
@@ -83,7 +98,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         mOpenCvCameraView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                cracked = false;
+                cracked = 0;
             }
         });
         mOpenCvCameraView.setCvCameraViewListener(this);
@@ -93,9 +108,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 .build();
         soundPool = new SoundPool.Builder()
                 .setAudioAttributes(attr)
-                .setMaxStreams(1)
+                .setMaxStreams(2)
                 .build();
         sound_crack = soundPool.load(this, R.raw.crack, 1);
+        sound_explode = soundPool.load(this, R.raw.explode, 1);
     }
 
     @Override
@@ -136,18 +152,27 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Mat src = inputFrame.rgba();//入力画像
         Mat dst = src.clone();
-        Imgproc.resize(crackMat, crackMat, src.size());
         RectF rect = faceDetect(src);
         Imgproc.rectangle(src, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 0, 0, 0), -1);
         double maxArea = getMaxSkinArea(src);
-            if(maxArea - fist > 200000){
-                cracked = true;
-                soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
+        if(maxArea - fist > 200000){
+            cracked++;
+            soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
+           if(cracked == 3){
+                soundPool.play(sound_explode, 1.0f, 1.0f, 0, 0, 1);
             }
-            if(cracked){
-                Core.addWeighted(dst, 1.0, crackMat, 1.0, 0, dst);
-            }
-            fist = maxArea;
+        }
+        if(cracked > 2){
+            Imgproc.rectangle(dst, new Point(0, 0), new Point(dst.width(), dst.height()), new Scalar(0, 0, 0, 0), -1);
+            Core.addWeighted(dst, 1.0, crackMat2, 1.0, 0, dst);
+        }
+        if(cracked > 1){
+            Core.addWeighted(dst, 1.0, crackMat, 1.0, 0, dst);
+        }
+        if(cracked > 0){
+            Core.addWeighted(dst, 1.0, crackMat1, 1.0, 0, dst);
+        }
+        fist = maxArea;
         return dst;
     }
     public static double getMaxSkinArea(Mat rgba) {
@@ -200,7 +225,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     faceRect = new RectF(position.x,
                             position.y,
                             position.x + face.getWidth(),
-                            position.y + face.getHeight());
+                            position.y + face.getHeight()*3/2);
                 }
             }
             else {

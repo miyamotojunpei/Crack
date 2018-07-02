@@ -79,6 +79,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private int sound_bloom;
     String gender = "?";
     double beauty = 0;
+    int age = 0;
     boolean isFemale = false;
     boolean isDetected = false;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -204,6 +205,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             case R.id.item_face:
                 mode = 1;
                 break;
+            case R.id.item_equal:
+                mode = 2;
+                break;
         }
         isDetected = false;
         isFemale = false;
@@ -222,8 +226,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Mat src = inputFrame.rgba();//入力画像
         Mat dst = src.clone();
+        RectF rect = faceDetect(src);
         if(mode == 0) {
-            RectF rect = faceDetect(src);
             Imgproc.rectangle(src, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 0, 0, 0), -1);
             double maxArea = getMaxSkinArea(src);
             if (maxArea - fist > 200000) {
@@ -236,17 +240,20 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             fist = maxArea;
         }
         else{
-            if(cracked == 0 && !isFemale && !isDetected) {
+            if(rect.height() > 0 && !isDetected) {
                 faceDetect2(src);
-                if(gender.equals("Male") && beauty < 65){
+                if(gender.equals("Male") && beauty < 65 && (mode == 2 || age < 40) || mode == 2 && gender.equals("Female") && beauty < 65){
                     soundPool.play(sound_explode, 1.0f, 1.0f, 0, 0, 1);
                     soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
                     cracked = 3;
                     isFemale = false;
+                    isDetected = true;
                 }
                 else if(!isFemale && (gender.equals("Female") || gender.equals("Male") && beauty >= 65)){
                     isFemale = true;
+                    cracked = 0;
                     soundPool.play(sound_bloom, 1.0f, 1.0f, 0, 0, 1);
+                    isDetected = true;
                 }
                 else{
                     isFemale = false;
@@ -375,7 +382,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 obos.writeBytes("--" + boundary + "\r\n");
                 obos.writeBytes("Content-Disposition: form-data; name=\"" + "return_attributes" + "\"\r\n");
                 obos.writeBytes("\r\n");
-                obos.writeBytes("gender,beauty" + "\r\n");
+                obos.writeBytes("gender,beauty,age" + "\r\n");
 
                 obos.writeBytes("--" + boundary + "\r\n");
                 obos.writeBytes("Content-Disposition: form-data; name=\"" + "image_base64" + "\"\r\n");
@@ -454,13 +461,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         try{
             Log.i(TAG, "getgender");
             JSONObject json = new JSONObject(new String(result));
-            if(json.getJSONArray("faces").length() > 0){
-                isDetected = true;
-            }
             gender = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("gender").getString("value");
             if(gender.equals("Male")){
                 beauty = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("beauty").getDouble("male_score");
             }
+            else if(gender.equals("Female")){
+                beauty = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("beauty").getDouble("female_score");
+            }
+            age = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("age").getInt("value");
         }
         catch (JSONException e){
             gender =  "?";

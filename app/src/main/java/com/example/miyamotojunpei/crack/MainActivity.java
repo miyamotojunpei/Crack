@@ -1,5 +1,6 @@
 package com.example.miyamotojunpei.crack;
 
+import android.app.ActionBar;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -7,9 +8,14 @@ import android.graphics.PointF;
 import android.graphics.RectF;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.util.SparseArray;
+import android.util.Xml;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.SurfaceView;
 import android.view.View;
 
@@ -17,6 +23,9 @@ import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.face.Face;
 import com.google.android.gms.vision.face.FaceDetector;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
@@ -30,9 +39,22 @@ import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.xmlpull.v1.XmlPullParser;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.InputStream;
+import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
+import javax.net.ssl.SSLException;
+
+import static android.view.Window.FEATURE_ACTION_BAR_OVERLAY;
 import static org.opencv.core.CvType.CV_8UC4;
 
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -40,6 +62,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private MyCameraView mOpenCvCameraView;
 
     FaceDetector detector;
+    int mode = 0;
     double fist = 1000000.0;
     Bitmap crack;
     Mat crackMat;
@@ -47,10 +70,17 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     Mat crackMat1;
     Bitmap crack2;
     Mat crackMat2;
+    Bitmap flower;
+    Mat flowerMat;
     int cracked = 0;
     SoundPool soundPool;
     private int sound_crack;
     private int sound_explode;
+    private int sound_bloom;
+    String gender = "?";
+    double beauty = 0;
+    boolean isFemale = false;
+    boolean isDetected = false;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -69,9 +99,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     crack2 = BitmapFactory.decodeResource(getResources(), R.drawable.crack2);
                     crackMat2 = new Mat(crack2.getHeight(), crack2.getWidth(), CV_8UC4);
                     Utils.bitmapToMat(crack2, crackMat2);
+                    flower = BitmapFactory.decodeResource(getResources(), R.drawable.flower);
+                    flowerMat = new Mat(flower.getHeight(), flower.getWidth(), CV_8UC4);
+                    Utils.bitmapToMat(flower, flowerMat);
+
                     Imgproc.resize(crackMat, crackMat, new Size(864, 480));
                     Imgproc.resize(crackMat1, crackMat1, new Size(864, 480));
                     Imgproc.resize(crackMat2, crackMat2, new Size(864, 480));
+                    Imgproc.resize(flowerMat, flowerMat, new Size(864, 480));
                 } break;
                 default:
                 {
@@ -91,6 +126,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "called onCreate");
         super.onCreate(savedInstanceState);
+        requestWindowFeature(FEATURE_ACTION_BAR_OVERLAY);
+        ActionBar action = getActionBar();
+        action.hide();
         setContentView(R.layout.activity_main);
         mOpenCvCameraView = (MyCameraView) findViewById(R.id.activity_main);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
@@ -99,6 +137,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             @Override
             public void onClick(View v) {
                 cracked = 0;
+                ActionBar action = getActionBar();
+                action.show();
             }
         });
         mOpenCvCameraView.setCvCameraViewListener(this);
@@ -112,6 +152,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 .build();
         sound_crack = soundPool.load(this, R.raw.crack, 1);
         sound_explode = soundPool.load(this, R.raw.explode, 1);
+        sound_bloom = soundPool.load(this, R.raw.bloom, 1);
     }
 
     @Override
@@ -140,10 +181,39 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
     }
+    @Override
+    public void onWindowFocusChanged( boolean hasFocus ) {
+        super.onWindowFocusChanged(hasFocus);
+        Log.i(TAG, "onWindowFocusChanged1()");
+        mOpenCvCameraView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        Log.d(TAG, "onCreateOptionsMenu");
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        Log.d(TAG, "onOptionsItemSelected");
+        switch (item.getItemId()) {
+            case R.id.item_punch:
+                mode = 0;
+                break;
+            case R.id.item_face:
+                mode = 1;
+                break;
+        }
+        isDetected = false;
+        isFemale = false;
+        gender = "?";
+        ActionBar action = getActionBar();
+        action.hide();
+        return true;
+    }
 
     public void onCameraViewStarted(int width, int height) {
-
-
     }
 
     public void onCameraViewStopped() {
@@ -152,14 +222,35 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Mat src = inputFrame.rgba();//入力画像
         Mat dst = src.clone();
-        RectF rect = faceDetect(src);
-        Imgproc.rectangle(src, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 0, 0, 0), -1);
-        double maxArea = getMaxSkinArea(src);
-        if(maxArea - fist > 200000){
-            cracked++;
-            soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
-           if(cracked == 3){
-                soundPool.play(sound_explode, 1.0f, 1.0f, 0, 0, 1);
+        if(mode == 0) {
+            RectF rect = faceDetect(src);
+            Imgproc.rectangle(src, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 0, 0, 0), -1);
+            double maxArea = getMaxSkinArea(src);
+            if (maxArea - fist > 200000) {
+                cracked++;
+                soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
+                if (cracked == 3) {
+                    soundPool.play(sound_explode, 1.0f, 1.0f, 0, 0, 1);
+                }
+            }
+            fist = maxArea;
+        }
+        else{
+            if(cracked == 0 && !isFemale && !isDetected) {
+                faceDetect2(src);
+                if(gender.equals("Male") && beauty < 65){
+                    soundPool.play(sound_explode, 1.0f, 1.0f, 0, 0, 1);
+                    soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
+                    cracked = 3;
+                    isFemale = false;
+                }
+                else if(!isFemale && (gender.equals("Female") || gender.equals("Male") && beauty >= 65)){
+                    isFemale = true;
+                    soundPool.play(sound_bloom, 1.0f, 1.0f, 0, 0, 1);
+                }
+                else{
+                    isFemale = false;
+                }
             }
         }
         if(cracked > 2){
@@ -172,7 +263,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         if(cracked > 0){
             Core.addWeighted(dst, 1.0, crackMat1, 1.0, 0, dst);
         }
-        fist = maxArea;
+        if(isFemale){
+            Core.addWeighted(dst, 1.0, flowerMat, 1.0, 0, dst);
+        }
         return dst;
     }
     public static double getMaxSkinArea(Mat rgba) {
@@ -234,5 +327,144 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
         detector.release();
         return faceRect;
+    }
+    private static class FaceDetectTask extends AsyncTask<String, Void, byte[]> {
+        private WeakReference<MainActivity> activityRef;
+        private final String facepp_url;
+        private final String facepp_api_key;
+        private final String facepp_api_secret;
+        FaceDetectTask(MainActivity activity) {
+            activityRef = new WeakReference<>(activity);
+            facepp_url = activity.getResources().getString(R.string.facepp_url);
+            facepp_api_key = activity.getResources().getString(R.string.facepp_api_key);
+            facepp_api_secret = activity.getResources().getString(R.string.facepp_api_secret);
+        }
+
+        @Override
+        protected byte[] doInBackground(String ... bitmapStr) {
+            String boundary = getBoundary();
+            HttpURLConnection conn = null;
+            String error = null;
+            try {
+                URL url = new URL(facepp_url);
+                conn = (HttpURLConnection)url.openConnection();
+                conn.setConnectTimeout(10000);
+                conn.setDoInput(true);
+                conn.setDoOutput(true);
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("accept", "*/*");
+                conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+                conn.setRequestProperty("connection", "Keep-Alive");
+                DataOutputStream obos = new DataOutputStream(conn.getOutputStream());
+
+
+                String key = "api_key";
+                String value = facepp_api_key;
+                obos.writeBytes("--" + boundary + "\r\n");
+                obos.writeBytes("Content-Disposition: form-data; name=\"" + key + "\"\r\n");
+                obos.writeBytes("\r\n");
+                obos.writeBytes(value + "\r\n");
+
+                key = "api_secret";
+                value = facepp_api_secret;
+                obos.writeBytes("--" + boundary + "\r\n");
+                obos.writeBytes("Content-Disposition: form-data; name=\"" + key + "\"\r\n");
+                obos.writeBytes("\r\n");
+                obos.writeBytes(value + "\r\n");
+
+                obos.writeBytes("--" + boundary + "\r\n");
+                obos.writeBytes("Content-Disposition: form-data; name=\"" + "return_attributes" + "\"\r\n");
+                obos.writeBytes("\r\n");
+                obos.writeBytes("gender,beauty" + "\r\n");
+
+                obos.writeBytes("--" + boundary + "\r\n");
+                obos.writeBytes("Content-Disposition: form-data; name=\"" + "image_base64" + "\"\r\n");
+                obos.writeBytes("\r\n");
+                obos.writeBytes(bitmapStr[0]);
+                obos.writeBytes("\r\n");
+
+                obos.writeBytes("--" + boundary + "--" + "\r\n");
+                obos.writeBytes("\r\n");
+                obos.flush();
+                obos.close();
+                InputStream ins = null;
+                int code = conn.getResponseCode();
+                try{
+                    if(code == 200){
+                        ins = conn.getInputStream();
+                        Log.i(TAG, Integer.toString(code));
+                    }
+                    else{
+                        Log.i(TAG, Integer.toString(code));
+                        ins = conn.getErrorStream();
+                        }
+                }catch (SSLException e)
+                {
+                    e.printStackTrace();
+                    return null;
+                }
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buff = new byte[4096];
+                int len;
+                while((len = ins.read(buff)) != -1){
+                    baos.write(buff, 0, len);
+                }
+                byte[] bytes = baos.toByteArray();
+                Log.i(TAG, new String(bytes));
+                ins.close();
+                return bytes;
+            }
+            catch (Exception e) {
+                error = e.toString();
+            }
+            finally {
+                if (conn != null) conn.disconnect();
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(byte[] result) {
+            MainActivity activity = activityRef.get();
+            if (activity == null || activity.isFinishing())
+                return;
+            activity.getScore(result);
+        }
+    }
+    public void faceDetect2(Mat src){
+        Bitmap bmp = Bitmap.createBitmap(src.cols(), src.rows(), Bitmap.Config.RGB_565);
+        Utils.matToBitmap(src, bmp);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
+        String bitmapStr = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT);
+        Log.i(TAG, "here");
+        new FaceDetectTask(MainActivity.this).execute(bitmapStr);
+    }
+
+    private static String getBoundary() {
+        StringBuilder sb = new StringBuilder();
+        Random random = new Random();
+        for(int i = 0; i < 32; ++i) {
+            sb.append("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-".charAt(random.nextInt("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_".length())));
+        }
+        return sb.toString();
+    }
+
+    public void getScore(byte[] result) {
+        try{
+            Log.i(TAG, "getgender");
+            JSONObject json = new JSONObject(new String(result));
+            if(json.getJSONArray("faces").length() > 0){
+                isDetected = true;
+            }
+            gender = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("gender").getString("value");
+            if(gender.equals("Male")){
+                beauty = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("beauty").getDouble("male_score");
+            }
+        }
+        catch (JSONException e){
+            gender =  "?";
+        }
+        Log.i(TAG,gender);
     }
 }

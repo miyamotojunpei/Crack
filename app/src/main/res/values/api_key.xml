@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="facepp_api_key">z6QLMIBRmrFrJsQpDKVFmmRgZd9le-Pv</string>
+    <string name="facepp_api_secret">Dwhprikq6W9qkeBjdcPDVz-vn3RAgGkp</string>
+    <string name="facepp_url">https://api-us.faceplusplus.com/facepp/v3/detect</string>
+</resources>

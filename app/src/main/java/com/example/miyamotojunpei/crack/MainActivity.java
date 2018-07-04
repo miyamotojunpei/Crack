@@ -13,7 +13,6 @@ import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
 import android.util.SparseArray;
-import android.util.Xml;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.SurfaceView;
@@ -23,7 +22,6 @@ import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.face.Face;
 import com.google.android.gms.vision.face.FaceDetector;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
@@ -39,7 +37,6 @@ import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
-import org.xmlpull.v1.XmlPullParser;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -47,9 +44,7 @@ import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 import javax.net.ssl.SSLException;
@@ -62,36 +57,39 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private MyCameraView mOpenCvCameraView;
 
     FaceDetector detector;
-    int mode = 0;
-    double fist = 1000000.0;
-    Bitmap crack;
-    Mat crackMat;
-    Bitmap crack1;
-    Mat crackMat1;
-    Bitmap crack2;
-    Mat crackMat2;
-    Bitmap flower;
-    Mat flowerMat;
-    int cracked = 0;
-    SoundPool soundPool;
+    private int mode = 0;
+    private double fist = 1000000.0;
+    private Bitmap crack;
+    private Mat crackMat;
+    private Bitmap crack1;
+    private Mat crackMat1;
+    private Bitmap crack2;
+    private Mat crackMat2;
+    private Bitmap flower;
+    private Mat flowerMat;
+    private int res_width = 864;
+    private int res_height = 480;
+    private int cracked = 0;
+    private SoundPool soundPool;
     private int sound_crack;
     private int sound_explode;
     private int sound_bloom;
-    String gender = "?";
-    double beauty = 0;
-    int age = 0;
-    boolean isFemale = false;
-    boolean isDetected = false;
+    private String gender = "?";
+    private double beauty = 0;
+    private int age = 0;
+    private boolean isFemale = false;
+    private boolean isDetected = false;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
-        public void onManagerConnected(int status) {
+        public void onManagerConnected(int status) { //OpenCVのマネージャへの接続
             switch (status) {
                 case LoaderCallbackInterface.SUCCESS:
                 {
                     Log.i(TAG, "OpenCV loaded successfully");
                     mOpenCvCameraView.enableView();
-                    mOpenCvCameraView.setResolution(864, 480);
-                    crack = BitmapFactory.decodeResource(getResources(), R.drawable.crack);
+                    mOpenCvCameraView.setResolution(res_width, res_height);
+
+                    crack = BitmapFactory.decodeResource(getResources(), R.drawable.crack); //画像をOpenCVで扱えるように処理
                     crackMat = new Mat(crack.getHeight(), crack.getWidth(), CV_8UC4);
                     Utils.bitmapToMat(crack, crackMat);
                     crack1 = BitmapFactory.decodeResource(getResources(), R.drawable.crack1);
@@ -104,10 +102,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     flowerMat = new Mat(flower.getHeight(), flower.getWidth(), CV_8UC4);
                     Utils.bitmapToMat(flower, flowerMat);
 
-                    Imgproc.resize(crackMat, crackMat, new Size(864, 480));
-                    Imgproc.resize(crackMat1, crackMat1, new Size(864, 480));
-                    Imgproc.resize(crackMat2, crackMat2, new Size(864, 480));
-                    Imgproc.resize(flowerMat, flowerMat, new Size(864, 480));
+                    Imgproc.resize(crackMat, crackMat, new Size(res_width, res_height));
+                    Imgproc.resize(crackMat1, crackMat1, new Size(res_width, res_height));
+                    Imgproc.resize(crackMat2, crackMat2, new Size(res_width, res_height));
+                    Imgproc.resize(flowerMat, flowerMat, new Size(res_width, res_height));
                 } break;
                 default:
                 {
@@ -132,7 +130,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         action.hide();
         setContentView(R.layout.activity_main);
         mOpenCvCameraView = (MyCameraView) findViewById(R.id.activity_main);
-        mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
+        mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE); //フルスクリーンにする
         mOpenCvCameraView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         mOpenCvCameraView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -143,7 +141,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
         });
         mOpenCvCameraView.setCvCameraViewListener(this);
-        AudioAttributes attr = new AudioAttributes.Builder()
+
+        AudioAttributes attr = new AudioAttributes.Builder() //音の登録
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build();
@@ -170,7 +169,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         super.onResume();
         if (!OpenCVLoader.initDebug()) {
             Log.d(TAG, "Internal OpenCV library not found. Using OpenCV Manager for initialization");
-            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this, mLoaderCallback);
+            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_2_0, this, mLoaderCallback);
         } else {
             Log.d(TAG, "OpenCV library found inside package. Using it!");
             mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
@@ -185,7 +184,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     @Override
     public void onWindowFocusChanged( boolean hasFocus ) {
         super.onWindowFocusChanged(hasFocus);
-        Log.i(TAG, "onWindowFocusChanged1()");
+        Log.i(TAG, "onWindowFocusChanged1()"); //操作をした後フルスクリーンに戻す処理
         mOpenCvCameraView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
     @Override
@@ -200,13 +199,13 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Log.d(TAG, "onOptionsItemSelected");
         switch (item.getItemId()) {
             case R.id.item_punch:
-                mode = 0;
+                mode = 0; //パンチモード
                 break;
             case R.id.item_face:
-                mode = 1;
+                mode = 1; //顔認識モード(女性とお年寄りに優しい)
                 break;
             case R.id.item_equal:
-                mode = 2;
+                mode = 2; //顔認識モード(全人類平等)
                 break;
         }
         isDetected = false;
@@ -226,11 +225,11 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         Mat src = inputFrame.rgba();//入力画像
         Mat dst = src.clone();
-        RectF rect = faceDetect(src);
-        if(mode == 0) {
+        RectF rect = faceDetect(src); //AndroidのAPIで顔認識
+        if(mode == 0) { //パンチモード
             Imgproc.rectangle(src, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 0, 0, 0), -1);
-            double maxArea = getMaxSkinArea(src);
-            if (maxArea - fist > 200000) {
+            double maxArea = getMaxSkinArea(src); //顔を除いて最も大きい肌色領域(手を想定)を検出
+            if (maxArea - fist > 200000) { //近づく速度が閾値を超えたら割れる(3回まで)
                 cracked++;
                 soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
                 if (cracked == 3) {
@@ -239,9 +238,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             }
             fist = maxArea;
         }
-        else{
+        else{ //美顔認識モード
             if(rect.height() > 0 && !isDetected) {
-                faceDetect2(src);
+                faceDetect2(src); //Face++の顔認識APIをたたく
+                //beautyが一定以下だと割れる，一定以上だと花の演出
                 if(gender.equals("Male") && beauty < 65 && (mode == 2 || age < 40) || mode == 2 && gender.equals("Female") && beauty < 65){
                     soundPool.play(sound_explode, 1.0f, 1.0f, 0, 0, 1);
                     soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
@@ -256,6 +256,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     isDetected = true;
                 }
                 else{
+                    Imgproc.rectangle(dst, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 255, 0, 255), 3);
                     isFemale = false;
                 }
             }
@@ -275,7 +276,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
         return dst;
     }
-    public static double getMaxSkinArea(Mat rgba) {
+    public static double getMaxSkinArea(Mat rgba) { //最大肌色領域を検出する関数
         if (rgba == null) {
             throw new IllegalArgumentException("parameter must not be null");
         }
@@ -302,7 +303,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return maxArea;
     }
 
-    RectF faceDetect(Mat src){
+    public RectF faceDetect(Mat src){ //AndroidのAPIで顔認識，一番大きい顔をとる
         detector = new FaceDetector.Builder(this)
                 .setTrackingEnabled(true)
                 .setLandmarkType(FaceDetector.NO_LANDMARKS)
@@ -335,7 +336,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         detector.release();
         return faceRect;
     }
-    private static class FaceDetectTask extends AsyncTask<String, Void, byte[]> {
+    private static class FaceDetectTask extends AsyncTask<String, Void, byte[]> { //Face++APIに接続する非同期タスク
         private WeakReference<MainActivity> activityRef;
         private final String facepp_url;
         private final String facepp_api_key;
@@ -348,7 +349,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
 
         @Override
-        protected byte[] doInBackground(String ... bitmapStr) {
+        protected byte[] doInBackground(String ... bitmapStr) { //カメラで撮った画像をBase64にして送信
             String boundary = getBoundary();
             HttpURLConnection conn = null;
             String error = null;
@@ -438,7 +439,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             activity.getScore(result);
         }
     }
-    public void faceDetect2(Mat src){
+    public void faceDetect2(Mat src){ //非同期タスクを起動する関数
         Bitmap bmp = Bitmap.createBitmap(src.cols(), src.rows(), Bitmap.Config.RGB_565);
         Utils.matToBitmap(src, bmp);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -448,7 +449,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         new FaceDetectTask(MainActivity.this).execute(bitmapStr);
     }
 
-    private static String getBoundary() {
+    public static String getBoundary() { //httoリクエストの境界を生成する
         StringBuilder sb = new StringBuilder();
         Random random = new Random();
         for(int i = 0; i < 32; ++i) {
@@ -457,7 +458,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return sb.toString();
     }
 
-    public void getScore(byte[] result) {
+    public void getScore(byte[] result) { //Face++の結果をパースする関数
         try{
             Log.i(TAG, "getgender");
             JSONObject json = new JSONObject(new String(result));

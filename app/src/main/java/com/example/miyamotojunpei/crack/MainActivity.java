@@ -77,8 +77,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private String gender = "?";
     private double beauty = 0;
     private int age = 0;
-    private boolean isFemale = false;
+    private boolean isBeauty = false;
     private boolean isDetected = false;
+    private byte[] jsonByte;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) { //OpenCVのマネージャへの接続
@@ -209,7 +210,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 break;
         }
         isDetected = false;
-        isFemale = false;
+        isBeauty = false;
         gender = "?";
         ActionBar action = getActionBar();
         action.hide();
@@ -240,24 +241,24 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         }
         else{ //美顔認識モード
             if(rect.height() > 0 && !isDetected) {
+                Log.i(TAG, "face mode");
                 faceDetect2(src); //Face++の顔認識APIをたたく
+                getScore(jsonByte);
                 //beautyが一定以下だと割れる，一定以上だと花の演出
                 if(gender.equals("Male") && beauty < 65 && (mode == 2 || age < 40) || mode == 2 && gender.equals("Female") && beauty < 65){
                     soundPool.play(sound_explode, 1.0f, 1.0f, 0, 0, 1);
                     soundPool.play(sound_crack, 1.0f, 1.0f, 0, 0, 1);
                     cracked = 3;
-                    isFemale = false;
-                    isDetected = true;
+                    isBeauty = false;
                 }
-                else if(!isFemale && (gender.equals("Female") || gender.equals("Male") && beauty >= 65)){
-                    isFemale = true;
-                    cracked = 0;
+                else if(!isBeauty && (gender.equals("Female") || gender.equals("Male") && (beauty >= 65 || age >= 40))){
                     soundPool.play(sound_bloom, 1.0f, 1.0f, 0, 0, 1);
-                    isDetected = true;
+                    cracked = 0;
+                    isBeauty = true;
                 }
                 else{
                     Imgproc.rectangle(dst, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 255, 0, 255), 3);
-                    isFemale = false;
+                    isBeauty = false;
                 }
             }
         }
@@ -271,7 +272,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         if(cracked > 0){
             Core.addWeighted(dst, 1.0, crackMat1, 1.0, 0, dst);
         }
-        if(isFemale){
+        if(isBeauty){
             Core.addWeighted(dst, 1.0, flowerMat, 1.0, 0, dst);
         }
         return dst;
@@ -336,6 +337,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         detector.release();
         return faceRect;
     }
+    
     private static class FaceDetectTask extends AsyncTask<String, Void, byte[]> { //Face++APIに接続する非同期タスク
         private WeakReference<MainActivity> activityRef;
         private final String facepp_url;
@@ -399,8 +401,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 int code = conn.getResponseCode();
                 try{
                     if(code == 200){
-                        ins = conn.getInputStream();
                         Log.i(TAG, Integer.toString(code));
+                        ins = conn.getInputStream();
                     }
                     else{
                         Log.i(TAG, Integer.toString(code));
@@ -436,9 +438,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             MainActivity activity = activityRef.get();
             if (activity == null || activity.isFinishing())
                 return;
-            activity.getScore(result);
+            activity.jsonByte = result;
         }
     }
+
     public void faceDetect2(Mat src){ //非同期タスクを起動する関数
         Bitmap bmp = Bitmap.createBitmap(src.cols(), src.rows(), Bitmap.Config.RGB_565);
         Utils.matToBitmap(src, bmp);
@@ -449,7 +452,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         new FaceDetectTask(MainActivity.this).execute(bitmapStr);
     }
 
-    public static String getBoundary() { //httoリクエストの境界を生成する
+    public static String getBoundary() { //httpリクエストの境界を生成する
         StringBuilder sb = new StringBuilder();
         Random random = new Random();
         for(int i = 0; i < 32; ++i) {
@@ -458,22 +461,25 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         return sb.toString();
     }
 
-    public void getScore(byte[] result) { //Face++の結果をパースする関数
-        try{
-            Log.i(TAG, "getgender");
-            JSONObject json = new JSONObject(new String(result));
-            gender = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("gender").getString("value");
-            if(gender.equals("Male")){
-                beauty = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("beauty").getDouble("male_score");
+    public void getScore(byte[] jsonByte) { //Face++の結果をパースする関数
+        if(jsonByte != null) {
+            try {
+                JSONObject json = new JSONObject(new String(jsonByte));
+                gender = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("gender").getString("value");
+                if (gender.equals("Male")) {
+                    beauty = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("beauty").getDouble("male_score");
+                    isDetected = true;
+                } else if (gender.equals("Female")) {
+                    beauty = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("beauty").getDouble("female_score");
+                    isDetected = true;
+                } else {
+                    gender = "?";
+                }
+                age = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("age").getInt("value");
+            } catch (JSONException e) {
+                gender = "?";
             }
-            else if(gender.equals("Female")){
-                beauty = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("beauty").getDouble("female_score");
-            }
-            age = json.getJSONArray("faces").getJSONObject(0).getJSONObject("attributes").getJSONObject("age").getInt("value");
+            Log.i(TAG, gender);
         }
-        catch (JSONException e){
-            gender =  "?";
-        }
-        Log.i(TAG,gender);
     }
 }

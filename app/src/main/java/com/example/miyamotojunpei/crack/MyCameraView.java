@@ -11,7 +11,6 @@ public class MyCameraView extends JavaCameraView {
     {
         super(context, attrs);
     }
-
     public void setResolution(int width, int height) {
         disconnectCamera();
         mMaxHeight = height;

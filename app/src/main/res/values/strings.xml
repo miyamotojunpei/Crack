@@ -4,4 +4,5 @@
     <string name="item_punch_label">Punch</string>
     <string name="item_face_label">Face</string>
     <string name="item_equal_label">Equal</string>
+    <string name="item_flip_label">Flip</string>
 </resources>

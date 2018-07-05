@@ -55,7 +55,7 @@ import static org.opencv.core.CvType.CV_8UC4;
 public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
     private static final String TAG = "Crack::Activity";
     private MyCameraView mOpenCvCameraView;
-
+    private int cameraId = 0;
     FaceDetector detector;
     private int mode = 0;
     private double fist = 1000000.0;
@@ -131,7 +131,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         action.hide();
         setContentView(R.layout.activity_main);
         mOpenCvCameraView = (MyCameraView) findViewById(R.id.activity_main);
-        mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE); //フルスクリーンにする
+        mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
+        //フルスクリーンにする
         mOpenCvCameraView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         mOpenCvCameraView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -207,6 +208,13 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 break;
             case R.id.item_equal:
                 mode = 2; //顔認識モード(全人類平等)
+                break;
+            case R.id.item_flip:
+                //bitwise not operation to flip 1 to 0 and vice versa
+                cameraId ^= 1;
+                mOpenCvCameraView.disableView();
+                mOpenCvCameraView.setCameraIndex(cameraId);
+                mOpenCvCameraView.enableView();
                 break;
         }
         isDetected = false;

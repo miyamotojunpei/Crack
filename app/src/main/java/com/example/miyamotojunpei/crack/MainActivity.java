@@ -2,6 +2,7 @@ package com.example.miyamotojunpei.crack;
 
 import android.app.ActionBar;
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.PointF;
@@ -10,13 +11,16 @@ import android.media.AudioAttributes;
 import android.media.SoundPool;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Base64;
 import android.util.Log;
 import android.util.SparseArray;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.SurfaceView;
 import android.view.View;
+import android.widget.Toast;
 
 import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.face.Face;
@@ -44,7 +48,9 @@ import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Random;
 
 import javax.net.ssl.SSLException;
@@ -58,6 +64,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private int cameraId = 0;
     FaceDetector detector;
     private int mode = 0;
+    private Mat src;
     private double fist = 1000000.0;
     private Bitmap crack;
     private Mat crackMat;
@@ -80,6 +87,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     private boolean isBeauty = false;
     private boolean isDetected = false;
     private byte[] jsonByte;
+    boolean isConnected = false;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) { //OpenCVのマネージャへの接続
@@ -183,6 +191,17 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
     }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        boolean ret = super.onKeyUp(keyCode, event);
+        if(keyCode == KeyEvent.KEYCODE_CAMERA) {
+            isConnected = true;
+            faceDetect2(src);
+        }
+        return ret;
+    }
+
     @Override
     public void onWindowFocusChanged( boolean hasFocus ) {
         super.onWindowFocusChanged(hasFocus);
@@ -220,6 +239,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         isDetected = false;
         isBeauty = false;
         gender = "?";
+        jsonByte = null;
+        isConnected = false;
         ActionBar action = getActionBar();
         action.hide();
         return true;
@@ -232,7 +253,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     }
 
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Mat src = inputFrame.rgba();//入力画像
+        src = inputFrame.rgba();//入力画像
         Mat dst = src.clone();
         RectF rect = faceDetect(src); //AndroidのAPIで顔認識
         if(mode == 0) { //パンチモード
@@ -248,9 +269,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
             fist = maxArea;
         }
         else{ //美顔認識モード
-            if(rect.height() > 0 && !isDetected) {
+            if(!isDetected) {
                 Log.i(TAG, "face mode");
-                faceDetect2(src); //Face++の顔認識APIをたたく
+                //faceDetect2(src); //Face++の顔認識APIをたたく
                 getScore(jsonByte);
                 //beautyが一定以下だと割れる，一定以上だと花の演出
                 if(gender.equals("Male") && beauty < 65 && (mode == 2 || age < 40) || mode == 2 && gender.equals("Female") && beauty < 65){
@@ -265,7 +286,12 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     isBeauty = true;
                 }
                 else{
-                    Imgproc.rectangle(dst, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 255, 0, 255), 3);
+                    if(isConnected){
+                        Imgproc.rectangle(dst, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(255, 0, 0, 255), 3);
+                    }
+                    else {
+                        Imgproc.rectangle(dst, new Point(rect.left, rect.top), new Point(rect.right, rect.bottom), new Scalar(0, 255, 0, 255), 3);
+                    }
                     isBeauty = false;
                 }
             }
@@ -415,6 +441,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                     else{
                         Log.i(TAG, Integer.toString(code));
                         ins = conn.getErrorStream();
+                        activityRef.get().isConnected = false;
                         }
                 }catch (SSLException e)
                 {

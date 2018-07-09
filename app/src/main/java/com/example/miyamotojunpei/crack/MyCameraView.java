@@ -6,7 +6,8 @@ import android.util.AttributeSet;
 
 import org.opencv.android.JavaCameraView;
 
-public class MyCameraView extends JavaCameraView {
+public class MyCameraView extends JavaCameraView{
+
     public MyCameraView(Context context, AttributeSet attrs)
     {
         super(context, attrs);
@@ -17,4 +18,5 @@ public class MyCameraView extends JavaCameraView {
         mMaxWidth = width;
         connectCamera(getWidth(), getHeight());
     }
+
 }

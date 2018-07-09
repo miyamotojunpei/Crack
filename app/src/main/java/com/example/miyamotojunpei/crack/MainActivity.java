@@ -371,7 +371,18 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         detector.release();
         return faceRect;
     }
-    
+
+    public void faceDetect2(Mat src){ //非同期タスクを起動する関数
+        Bitmap bmp = Bitmap.createBitmap(src.cols(), src.rows(), Bitmap.Config.RGB_565);
+        Utils.matToBitmap(src, bmp);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
+        String bitmapStr = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT);
+        Log.i(TAG, "here");
+        new FaceDetectTask(MainActivity.this).execute(bitmapStr);
+    }
+
+
     private static class FaceDetectTask extends AsyncTask<String, Void, byte[]> { //Face++APIに接続する非同期タスク
         private WeakReference<MainActivity> activityRef;
         private final String facepp_url;
@@ -475,16 +486,6 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
                 return;
             activity.jsonByte = result;
         }
-    }
-
-    public void faceDetect2(Mat src){ //非同期タスクを起動する関数
-        Bitmap bmp = Bitmap.createBitmap(src.cols(), src.rows(), Bitmap.Config.RGB_565);
-        Utils.matToBitmap(src, bmp);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
-        String bitmapStr = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT);
-        Log.i(TAG, "here");
-        new FaceDetectTask(MainActivity.this).execute(bitmapStr);
     }
 
     public static String getBoundary() { //httpリクエストの境界を生成する
